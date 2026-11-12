@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 
 from api.app import app
 
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=False)
+JSON = {"Content-Type": "application/json"}
 
 
 # ---------- /health ----------
@@ -111,3 +112,135 @@ def test_eta_get_not_allowed():
     """/eta 는 POST 전용이라 GET 은 405 를 돌려준다."""
     res = client.get("/eta")
     assert res.status_code == 405
+
+
+# ---------- /health 구조 ----------
+
+def test_health_has_exact_keys():
+    """/health 응답 키는 정확히 status, model 두 개다."""
+    assert set(client.get("/health").json()) == {"status", "model"}
+
+
+def test_unknown_endpoint_returns_404():
+    """없는 경로는 404 를 돌려준다."""
+    assert client.get("/no-such-path").status_code == 404
+
+
+# ---------- /eta 경계값·정밀도 ----------
+
+def test_eta_just_below_zero_distance_returns_422():
+    """0 바로 아래 거리(-0.0001)도 422 로 거부한다."""
+    res = client.post("/eta", json={"distance_km": -0.0001, "pending_orders": 0})
+    assert res.status_code == 422
+
+
+def test_eta_negative_zero_distance_treated_as_zero():
+    """-0.0 은 0 으로 취급되어 기본 시간 10분을 돌려준다."""
+    res = client.post(
+        "/eta", content='{"distance_km": -0.0, "pending_orders": 0}', headers=JSON
+    )
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(10.0)
+
+
+def test_eta_tiny_distance():
+    """아주 작은 거리(1e-9)도 정밀도를 잃지 않고 계산한다."""
+    res = client.post("/eta", json={"distance_km": 1e-9, "pending_orders": 0})
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(10.0 + 3e-9, rel=1e-12)
+
+
+def test_eta_huge_integer_orders():
+    """거대한 정수 주문 수(10**30)도 거부하지 않고 공식대로 계산한다."""
+    res = client.post("/eta", json={"distance_km": 0, "pending_orders": 10**30})
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(2e30)
+
+
+# ---------- /eta 비유한 값 (알려진 버그) ----------
+# Python JSON 파서는 표준 밖의 NaN/Infinity 리터럴을 받아들인다.
+# 계약상 minutes 는 숫자이므로 이런 입력은 422 여야 한다.
+# 현재 앱은 500 또는 minutes=null 을 돌려주므로 xfail 로 기록한다.
+# 앱이 고쳐지면 strict=True 때문에 XPASS → 실패하니, 그때 xfail 을 지운다.
+
+@pytest.mark.xfail(strict=True, reason="버그: NaN 이 ge=0 검사를 통과해 응답 직렬화에서 500")
+def test_eta_nan_distance_returns_422():
+    """distance_km 가 NaN 이면 422 를 돌려준다."""
+    res = client.post(
+        "/eta", content='{"distance_km": NaN, "pending_orders": 0}', headers=JSON
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.xfail(strict=True, reason="버그: Infinity 입력 시 200 + minutes=null")
+def test_eta_infinite_distance_returns_422():
+    """distance_km 가 Infinity 면 422 를 돌려준다."""
+    res = client.post(
+        "/eta", content='{"distance_km": Infinity, "pending_orders": 0}', headers=JSON
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.xfail(strict=True, reason="버그: 3*1e308 이 inf 로 넘쳐 minutes=null")
+def test_eta_overflowing_distance_never_returns_null_minutes():
+    """계산이 넘칠 만큼 큰 거리여도 minutes 가 null 인 200 응답은 내지 않는다."""
+    res = client.post("/eta", json={"distance_km": 1e308, "pending_orders": 0})
+    assert not (res.status_code == 200 and res.json()["minutes"] is None)
+
+
+# ---------- /eta 입력 타입 관대함 (현재 동작 고정) ----------
+# 스펙이 아직 정해지지 않아 Pydantic 기본(lax) 동작을 그대로 기록한다.
+# 스펙이 정해지면 기대값을 바꾼다.
+
+def test_eta_numeric_strings_are_coerced():
+    """[현재 동작] 숫자 문자열("2", "1")은 숫자로 변환되어 받아들여진다."""
+    res = client.post("/eta", json={"distance_km": "2", "pending_orders": "1"})
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(18.0)
+
+
+def test_eta_booleans_are_coerced():
+    """[현재 동작] true 는 1 로 변환되어 받아들여진다."""
+    res = client.post("/eta", json={"distance_km": True, "pending_orders": True})
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(15.0)
+
+
+def test_eta_whole_float_orders_accepted():
+    """[현재 동작] pending_orders 1.0 은 정수 1 로 받아들여진다."""
+    res = client.post("/eta", json={"distance_km": 1, "pending_orders": 1.0})
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(15.0)
+
+
+def test_eta_extra_fields_ignored():
+    """[현재 동작] 정의되지 않은 필드는 무시된다."""
+    res = client.post("/eta", json={"distance_km": 1, "pending_orders": 0, "x": 1})
+    assert res.status_code == 200
+    assert res.json()["minutes"] == pytest.approx(13.0)
+
+
+# ---------- /eta 요청 형식 ----------
+
+@pytest.mark.parametrize(
+    ("content", "headers"),
+    [
+        ('{"distance_km": 1,', JSON),                                   # 깨진 JSON
+        ("[1, 2]", JSON),                                               # 객체가 아닌 본문
+        ('{"distance_km": 1, "pending_orders": 0}', {"Content-Type": "text/plain"}),
+    ],
+    ids=["malformed-json", "array-body", "text-plain"],
+)
+def test_eta_bad_request_format_returns_422(content, headers):
+    """깨진 JSON, 객체가 아닌 본문, JSON 이 아닌 Content-Type 은 422 를 돌려준다."""
+    assert client.post("/eta", content=content, headers=headers).status_code == 422
+
+
+def test_eta_422_body_points_to_missing_field():
+    """422 응답 본문은 detail 목록이며, 누락된 필드 위치를 loc 로 알려 준다."""
+    res = client.post("/eta", json={"pending_orders": 0})
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    assert isinstance(detail, list) and detail
+    assert all({"loc", "msg", "type"} <= set(err) for err in detail)
+    assert ["body", "distance_km"] in [err["loc"] for err in detail]
