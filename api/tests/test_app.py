@@ -6,6 +6,14 @@ from api.app import app
 client = TestClient(app, raise_server_exceptions=False)
 JSON = {"Content-Type": "application/json"}
 
+# ---------- / ----------
+
+def test_index_returns_html():
+    """/ 는 200 과 HTML 소개 페이지를 돌려준다."""
+    res = client.get("/")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/html")
+    assert "/eta" in res.text
 
 # ---------- /health ----------
 
