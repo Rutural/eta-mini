@@ -11,3 +11,9 @@ dependencies = [
 
 [tool.uv]
 python-preference = "only-system"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["api/tests"]
+addopts = "-ra"
+
