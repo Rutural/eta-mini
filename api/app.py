@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+# 어떤 방식의 API를 쓸 것인지를 외부에서 환경변수를 통해 주입
 MODEL_IMPL = os.getenv("MODEL_IMPL", "rule")
 estimate_delivery_minutes = importlib.import_module(f"api.predictors.{MODEL_IMPL}").estimate_delivery_minutes
 
