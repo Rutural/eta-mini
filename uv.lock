@@ -313,11 +313,9 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx2" },
-    { name = "joblib" },
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pytest" },
-    { name = "scikit-learn" },
     { name = "uvicorn" },
 ]
 
@@ -325,20 +323,20 @@ dependencies = [
 train = [
     { name = "onnx" },
     { name = "onnxscript" },
+    { name = "scikit-learn" },
     { name = "skl2onnx" },
     { name = "torch", version = "2.15.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+    { name = "train" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.162.4" },
     { name = "httpx2", specifier = ">=2.16.0" },
-    { name = "joblib", specifier = ">=1.6.0" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "onnxruntime", specifier = ">=1.32.0" },
     { name = "pytest", specifier = ">=9.2.0" },
-    { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
@@ -346,8 +344,10 @@ requires-dist = [
 train = [
     { name = "onnx", specifier = ">=1.23.2" },
     { name = "onnxscript", specifier = ">=0.7.2" },
+    { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "skl2onnx", specifier = ">=1.20.0" },
     { name = "torch", specifier = ">=2.15.0", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "train", specifier = ">=0.0.5" },
 ]
 
 [[package]]
@@ -865,6 +865,15 @@ wheels = [
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp315-cp315t-manylinux_2_28_x86_64.whl", hash = "sha256:92551daf5873fc6db15be48fe9644398f13143291c151ab6769f19e7c5ebd10c", upload-time = "2026-10-28T13:20:33Z" },
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp315-cp315t-win_amd64.whl", hash = "sha256:694b58039c3b1df7f5a890e97494728de849adb168a4617dd6024ca19eb8598e", upload-time = "2026-10-28T13:20:39Z" },
 ]
+
+[[package]]
+name = "train"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f7/bd/03ef37dfb2f0550f1fa43423bf8a2c833d1833ce1d90eb71dee05131eee2/train-0.0.5.tar.gz", hash = "sha256:441beaa4b792bdca301ac3c69bb8299256873e081a9f0de1e3782064a2f36cdf", size = 8083, upload-time = "2019-12-18T14:07:18.291Z" }
 
 [[package]]
 name = "truststore"
