@@ -1,0 +1,21 @@
+[package]
+name = "api-rust"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+# arbitrary_precision: 숫자 원문을 보존해 10**30 같은 큰 정수와 1e30 같은 실수 표기를 구분한다.
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+# load-dynamic: ONNX Runtime 공유 라이브러리를 실행 중에 ORT_LIB 경로에서 dlopen 한다.
+# 기본 기능(download-binaries 등)을 끄므로 빌드 중에 런타임을 내려받지 않는다.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+
+[profile.release]
+strip = true
